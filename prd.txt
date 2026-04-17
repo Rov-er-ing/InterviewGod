@@ -1,0 +1,470 @@
+# Product Requirements Document (PRD)
+
+## Signal Detection System — Mass Hiring / Scale-Up Signal Detector
+
+**For: Vikaas.ai Platform | Product: InterviewGod**
+**Version: 1.0 | Date: April 17, 2026**
+
+---
+
+## 1. Overview
+
+### 1.1 Purpose
+
+This PRD defines the requirements for building a local, serverless-style signal detection system in Python that identifies mass hiring and scale-up signals from public data sources. The system will feed structured signals into the Vikaas.ai platform to power contextual outreach for InterviewGod.
+
+### 1.2 Problem Statement
+
+Sales and outreach teams need timely intelligence about companies entering large hiring phases. Manually tracking news, press releases, and job boards is slow and unscalable. An automated pipeline that ingests public data, applies rule-based detection, and outputs machine-readable signals will dramatically reduce this manual overhead.
+
+### 1.3 Goals
+
+- Ingest public news and article data for a configurable list of target companies
+- Detect hiring-related signals using keyword and numeric pattern matching
+- Score each signal by confidence
+- Output structured JSON records consumable by downstream systems
+- Remain entirely free, local, and dependency-light
+
+### 1.4 Non-Goals
+
+- No LLM or AI API usage
+- No cloud deployment
+- No paid data sources
+- No real-time streaming (batch/scheduled runs only)
+
+---
+
+## 2. System Architecture
+
+### 2.1 High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    CLI / FastAPI Runner                  │
+└────────────────────────┬────────────────────────────────┘
+                         │
+         ┌───────────────▼───────────────┐
+         │        Orchestrator           │
+         │   (signals/orchestrator.py)   │
+         └──┬──────────┬────────────┬───┘
+            │          │            │
+     ┌──────▼───┐ ┌────▼─────┐ ┌───▼──────┐
+     │ Fetcher  │ │  Parser  │ │  Scorer  │
+     │ Module   │ │  Module  │ │  Module  │
+     └──────────┘ └──────────┘ └──────────┘
+            │          │            │
+            └──────────▼────────────┘
+                 ┌─────────────┐
+                 │   Output    │
+                 │  (JSON /    │
+                 │   SQLite)   │
+                 └─────────────┘
+```
+
+### 2.2 Directory Structure
+
+```
+signal-detector/
+├── README.md
+├── requirements.txt
+├── config.yaml                  # Target companies, thresholds, sources
+├── main.py                      # CLI entry point
+├── api.py                       # Optional FastAPI wrapper
+│
+├── signals/
+│   ├── __init__.py
+│   ├── orchestrator.py          # Coordinates all modules
+│   ├── mass_hiring/
+│   │   ├── __init__.py
+│   │   ├── fetcher.py           # Fetches RSS / HTML
+│   │   ├── parser.py            # Extracts text, entities
+│   │   ├── scorer.py            # Scores each article
+│   │   └── keywords.py          # Keyword/pattern definitions
+│
+├── utils/
+│   ├── __init__.py
+│   ├── http.py                  # HTTP helpers, retries, rate-limiting
+│   ├── text.py                  # Text cleaning, normalization
+│   ├── storage.py               # JSON / SQLite write helpers
+│   └── logger.py                # Structured logging
+│
+├── data/
+│   ├── companies.json           # Input: list of target companies
+│   └── sample_output.json       # Example output record
+│
+└── outputs/
+    └── signals_YYYYMMDD.json    # Generated output files
+```
+
+---
+
+## 3. Module Specifications
+
+### 3.1 Configuration (`config.yaml`)
+
+The config file is the single source of truth for runtime behavior. It must support:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `companies_file` | string | Path to companies input JSON |
+| `output_dir` | string | Where to write signal files |
+| `output_format` | enum: `json`, `sqlite` | Output storage format |
+| `rss_sources` | list of URL templates | RSS feed patterns with `{query}` placeholder |
+| `score_threshold` | int (0–100) | Minimum score to emit a signal |
+| `fetch_timeout_seconds` | int | HTTP request timeout |
+| `max_articles_per_company` | int | Cap articles fetched per company |
+| `dedup_window_hours` | int | Suppress re-emitting same article within N hours |
+
+### 3.2 Input Data (`data/companies.json`)
+
+```json
+[
+  {
+    "name": "Infosys",
+    "aliases": ["Infosys Ltd", "Infosys Technologies"],
+    "domain": "infosys.com",
+    "industry": "IT Services"
+  },
+  {
+    "name": "Zomato",
+    "aliases": ["Zomato Ltd"],
+    "domain": "zomato.com",
+    "industry": "Food Tech"
+  }
+]
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Canonical company name used in queries |
+| `aliases` | No | Alternate names for matching in article text |
+| `domain` | No | Used for source URL filtering |
+| `industry` | No | For downstream enrichment/filtering |
+
+---
+
+### 3.3 Fetcher Module (`signals/mass_hiring/fetcher.py`)
+
+**Responsibility:** Retrieve raw article data from public sources for each target company.
+
+**Data Sources (in priority order):**
+
+| Source | URL Pattern | Notes |
+|---|---|---|
+| Google News RSS | `https://news.google.com/rss/search?q={company}+hiring` | Primary source |
+| Google News RSS (variant) | `https://news.google.com/rss/search?q={company}+expansion+jobs` | Secondary query |
+| Bing News RSS | `https://www.bing.com/news/search?q={company}+hiring&format=RSS` | Fallback |
+| Feedspot / aggregators | Configurable | Optional fallback |
+
+**Fetch Logic:**
+
+1. For each company, construct N query variants (hiring, expansion, campus drive, etc.)
+2. Fetch each RSS feed with timeout and retry (max 3 attempts, exponential backoff)
+3. Parse XML with `feedparser` or `xml.etree.ElementTree`
+4. Extract per-article: `title`, `link`, `published`, `summary`
+5. For articles where the summary is thin (<100 chars), attempt full-page fetch with `requests` + `BeautifulSoup`
+6. Deduplicate by URL within the dedup window
+7. Return a list of raw article dicts
+
+**Error Handling:**
+
+- Network timeout → log warning, skip source, continue
+- HTTP 4xx/5xx → log error with status code, skip
+- Malformed XML → log parse error, skip feed
+- Rate limiting (429) → back off 60 seconds, retry once
+
+**Output per article:**
+
+```python
+{
+  "company_name": str,
+  "title": str,
+  "url": str,
+  "published_at": str,   # ISO 8601
+  "raw_text": str        # title + summary + body (if fetched)
+}
+```
+
+---
+
+### 3.4 Parser Module (`signals/mass_hiring/parser.py`)
+
+**Responsibility:** Extract structured signals from raw article text.
+
+**Parsing Steps:**
+
+1. **Text normalization** — lowercase, strip HTML tags, collapse whitespace
+2. **Company mention validation** — confirm company name or alias appears in text; discard if not
+3. **Keyword extraction** — scan for hiring signal keywords (see §3.5)
+4. **Numeric extraction** — use regex to find hiring volume numbers
+5. **Context window** — for each keyword match, extract ±30 words of surrounding context
+6. **Entity tagging** — tag matches as `keyword_match` or `numeric_match`
+
+**Numeric Pattern Regex (examples):**
+
+```
+\b(\d{1,3}(?:,\d{3})*)\s*\+?\s*(engineers?|developers?|employees?|hires?|jobs?|positions?|roles?|freshers?|candidates?)\b
+\b(hiring|recruit)\s+(\d[\d,]*)\s*\+?
+\b(\d+)k\s*(hires?|jobs?|employees?)
+```
+
+**Output per article:**
+
+```python
+{
+  "company_name": str,
+  "url": str,
+  "published_at": str,
+  "matched_keywords": list[str],
+  "numeric_signals": list[{"value": int, "unit": str, "context": str}],
+  "keyword_contexts": list[str],
+  "raw_text_length": int
+}
+```
+
+---
+
+### 3.5 Keyword Definitions (`signals/mass_hiring/keywords.py`)
+
+Keywords organized in tiers by signal strength:
+
+**Tier 1 — Strong Hiring Signals (high weight):**
+`mass hiring`, `large scale hiring`, `hiring spree`, `bulk recruitment`, `mega recruitment`, `aggressive hiring`, `10000 hires`, `1000 engineers`
+
+**Tier 2 — Moderate Signals (medium weight):**
+`hiring`, `recruiting`, `recruitment drive`, `campus drive`, `lateral hiring`, `fresher hiring`, `expansion`, `scaling up`, `new office`, `headcount`, `workforce expansion`, `job openings`
+
+**Tier 3 — Weak / Contextual Signals (low weight):**
+`talent acquisition`, `onboarding`, `new roles`, `open positions`, `we are growing`, `join our team`, `career opportunities`
+
+**Negative Signals (reduce score):**
+`layoffs`, `downsizing`, `retrenchment`, `job cuts`, `reduction in force`, `freeze hiring`, `hiring freeze`, `restructuring`
+
+---
+
+### 3.6 Scorer Module (`signals/mass_hiring/scorer.py`)
+
+**Responsibility:** Assign a 0–100 confidence score to each parsed article signal.
+
+**Scoring Formula:**
+
+```
+base_score = 0
+
+# Keyword tier contributions
+base_score += count(tier1_keywords) × 25    (cap at 50)
+base_score += count(tier2_keywords) × 10    (cap at 30)
+base_score += count(tier3_keywords) × 5     (cap at 10)
+
+# Numeric signal bonus
+if any numeric_signal with value >= 10000: base_score += 20
+elif any numeric_signal with value >= 1000: base_score += 15
+elif any numeric_signal with value >= 500:  base_score += 10
+elif any numeric_signal with value >= 100:  base_score += 5
+
+# Source credibility bonus
+if source domain in trusted_domains list: base_score += 10
+
+# Recency bonus
+if published within 24h: base_score += 10
+elif published within 7d: base_score += 5
+
+# Negative signal penalty
+base_score -= count(negative_keywords) × 15
+
+final_score = clamp(base_score, 0, 100)
+```
+
+**Score Bands:**
+
+| Range | Label | Meaning |
+|---|---|---|
+| 80–100 | `high` | Strong hiring signal, act immediately |
+| 50–79 | `medium` | Likely signal, worth reviewing |
+| 20–49 | `low` | Weak signal, monitor |
+| 0–19 | `noise` | Filtered out (not emitted) |
+
+**Reason Generation:**
+
+The scorer must produce a human-readable `reason` string by combining the top matched signals. Example:
+
+> "Large scale hiring announcement detected: 2 Tier-1 keywords matched ('mass hiring', 'bulk recruitment'), numeric signal of 5000 engineers found, published 3 hours ago."
+
+---
+
+### 3.7 Output Module (`utils/storage.py`)
+
+**JSON Output:**
+
+Each run appends to or creates `outputs/signals_YYYYMMDD.json`. Each file is a JSON array of signal records.
+
+**Signal Record Schema:**
+
+```json
+{
+  "id": "uuid4",
+  "company": "Infosys",
+  "signal_type": "mass_hiring",
+  "source_url": "https://...",
+  "matched_keywords": ["hiring", "5000 engineers"],
+  "numeric_signals": [{"value": 5000, "unit": "engineers", "context": "..."}],
+  "signal_score": 82,
+  "signal_band": "high",
+  "detected_at": "2026-04-17T10:30:00Z",
+  "published_at": "2026-04-17T08:00:00Z",
+  "reason": "Large scale hiring announcement detected...",
+  "source_title": "Infosys to hire 5000 engineers in Q2",
+  "industry": "IT Services"
+}
+```
+
+**SQLite Output (optional):**
+
+Table: `signals`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | TEXT PRIMARY KEY | UUID |
+| `company` | TEXT | |
+| `signal_type` | TEXT | |
+| `source_url` | TEXT | |
+| `matched_keywords` | TEXT | JSON-serialized list |
+| `signal_score` | INTEGER | |
+| `signal_band` | TEXT | |
+| `detected_at` | TEXT | ISO 8601 |
+| `published_at` | TEXT | ISO 8601 |
+| `reason` | TEXT | |
+
+---
+
+### 3.8 Orchestrator (`signals/orchestrator.py`)
+
+**Responsibility:** Wire all modules together and manage execution flow.
+
+**Execution Flow:**
+
+```
+1. Load config.yaml
+2. Load companies.json
+3. For each company:
+   a. fetcher.fetch(company) → raw_articles[]
+   b. parser.parse(raw_articles) → parsed_signals[]
+   c. scorer.score(parsed_signals) → scored_signals[]
+   d. Filter by score_threshold
+   e. storage.write(scored_signals)
+4. Log summary: N companies processed, M signals emitted
+```
+
+**Concurrency:** Use `concurrent.futures.ThreadPoolExecutor` with configurable `max_workers` (default: 4) to parallelize company-level fetch jobs.
+
+---
+
+## 4. CLI Runner (`main.py`)
+
+```
+Usage:
+  python main.py [OPTIONS]
+
+Options:
+  --companies FILE     Path to companies JSON (default: data/companies.json)
+  --config FILE        Path to config YAML (default: config.yaml)
+  --output-format      json | sqlite (default: json)
+  --score-threshold    Integer 0-100 (default: from config)
+  --company NAME       Run for a single company only
+  --dry-run            Parse and score but do not write output
+  --verbose            Print debug logs to stdout
+```
+
+---
+
+## 5. Optional FastAPI Wrapper (`api.py`)
+
+Expose the pipeline as a local REST API for integration testing.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `POST /detect` | POST | Run detection for given company list, return signals |
+| `GET /signals` | GET | Return all signals from today's output file |
+| `GET /health` | GET | Returns `{"status": "ok"}` |
+
+**Request body for `POST /detect`:**
+
+```json
+{
+  "companies": ["Infosys", "Wipro"],
+  "score_threshold": 50
+}
+```
+
+---
+
+## 6. Dependencies (`requirements.txt`)
+
+```
+requests>=2.31.0          # HTTP fetching
+feedparser>=6.0.8         # RSS parsing
+beautifulsoup4>=4.12.0    # HTML parsing
+lxml>=4.9.0               # Fast XML/HTML parser backend
+pyyaml>=6.0               # Config file parsing
+python-dateutil>=2.8.2    # Date parsing
+fastapi>=0.110.0          # Optional API wrapper
+uvicorn>=0.29.0           # Optional ASGI server
+```
+
+All packages are free and pip-installable. No paid APIs. No LLMs.
+
+---
+
+## 7. Assumptions and Limitations
+
+| # | Assumption / Limitation |
+|---|---|
+| 1 | Google News RSS may throttle aggressive scraping; the system applies delays and caps requests per run |
+| 2 | Article summaries in RSS may be truncated; full-page fetch is attempted but not guaranteed |
+| 3 | Numeric extraction is regex-based and may miss non-standard formats ("five thousand hires") |
+| 4 | Score thresholds are heuristic and will need tuning against real data |
+| 5 | No authentication is used; paywalled articles are skipped |
+| 6 | The system does not deduplicate across runs beyond the configurable time window |
+| 7 | Company name matching is string-based; subsidiary or brand names may be missed without aliases |
+| 8 | RSS feed availability is subject to Google/Bing ToS changes |
+
+---
+
+## 8. Testing Plan
+
+| Test Type | Scope | Tool |
+|---|---|---|
+| Unit tests | Parser regex patterns, scorer formula | `pytest` |
+| Unit tests | Fetcher with mocked HTTP responses | `pytest` + `responses` library |
+| Integration tests | Full pipeline on sample RSS XML fixtures | `pytest` |
+| Edge case tests | Empty RSS, 0 articles, negative signals, malformed XML | `pytest` |
+| Output validation | JSON schema conformance of output records | `jsonschema` |
+
+---
+
+## 9. Evaluation Checklist (Mapped to Assignment Criteria)
+
+| Criterion | How It's Met |
+|---|---|
+| Code quality and structure | Modular directories, single-responsibility modules, typed functions |
+| Robustness of data ingestion | Retry logic, timeout handling, multiple source fallbacks |
+| Signal detection logic | Tiered keywords, regex numerics, negative penalties, scored bands |
+| Output clarity | Structured JSON with reason strings and score bands |
+| Edge case handling | Empty feeds, missing text, duplicate URLs, score clamping |
+| Documentation | README with setup steps, this PRD, inline docstrings |
+
+---
+
+## 10. Delivery Milestones
+
+| Milestone | Deliverable |
+|---|---|
+| M1 | Project scaffold, config, companies.json, logger |
+| M2 | Fetcher module with RSS + fallback, unit tests |
+| M3 | Parser module with keyword + regex extraction |
+| M4 | Scorer module with formula and reason generation |
+| M5 | Storage module (JSON + SQLite), orchestrator wiring |
+| M6 | CLI runner, README, sample outputs |
+| M7 | Optional FastAPI wrapper, full integration test run |

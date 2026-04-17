@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Infosys",
+    "aliases": ["Infosys Ltd", "Infosys Technologies"],
+    "domain": "infosys.com",
+    "industry": "IT Services"
+  },
+  {
+    "name": "Zomato",
+    "aliases": ["Zomato Ltd"],
+    "domain": "zomato.com",
+    "industry": "Food Tech"
+  },
+  {
+    "name": "Wipro",
+    "aliases": ["Wipro Limited"],
+    "domain": "wipro.com",
+    "industry": "IT Services"
+  },
+  {
+    "name": "Reliance",
+    "aliases": ["Reliance Industries"],
+    "domain": "reliance.com",
+    "industry": "Conglomerate"
+  }
+]

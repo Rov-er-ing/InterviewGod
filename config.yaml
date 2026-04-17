@@ -1,0 +1,23 @@
+companies_file: "data/companies.json"
+output_dir: "outputs"
+output_format: "json"  # json | sqlite
+
+rss_sources:
+  - "https://news.google.com/rss/search?q={company}+hiring"
+  - "https://news.google.com/rss/search?q={company}+expansion+jobs"
+  - "https://www.bing.com/news/search?q={company}+hiring&format=RSS"
+
+score_threshold: 50
+fetch_timeout_seconds: 15
+max_articles_per_company: 10
+dedup_window_hours: 24
+concurrency_workers: 4
+
+trusted_domains:
+  - "techcrunch.com"
+  - "reuters.com"
+  - "bloomberg.com"
+  - "economictimes.indiatimes.com"
+  - "business-standard.com"
+  - "forbes.com"
+  - "wsj.com"
