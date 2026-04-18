@@ -1,12 +1,12 @@
 # ⚡ Signal Detection System (SDS)
-> **Elite Hiring Intelligence for Vikaas.ai**
+> **Advanced Hiring Market Intelligence & Scale-Up Detection**
 
 [![Tests](https://img.shields.io/badge/tests-9%20passed-success)](tests/)
 [![Architecture](https://img.shields.io/badge/arch-modular-blue)](signals/)
 [![Status](https://img.shields.io/badge/status-GSD%20Quality-orange)]()
 
-## 💎 Value Proposition (Vikaas.ai)
-Vikaas.ai empowers users with unfair career advantages. The **Signal Detection System** is the engine behind that edge—it identifies massive hiring surges and expansion signals *before* they hit mainstream job boards. By monitoring "Scale-Up Signals" in real-time news, we provide Vikaas.ai users with a first-mover advantage, placing them at the front of the line for companies in rapid expansion.
+## 💎 Value Proposition
+The **Signal Detection System (SDS)** identifies massive hiring surges and expansion signals *before* they hit mainstream job boards. By monitoring "Scale-Up Signals" in real-time news across global IT and tech sectors, SDS provides a data-driven "first-mover" advantage for identifying companies in rapid expansion.
 
 ---
 
@@ -94,4 +94,4 @@ signal-detector/
 ```
 
 ---
-**Crafted with precision for Vikaas.ai. Results, not promises.**
+**Crafted with precision. Results, not promises.**
