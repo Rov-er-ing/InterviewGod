@@ -1,121 +1,97 @@
-# 🚀 Signal Detection System: InterviewGod
+# ⚡ Signal Detection System (SDS)
+> **Elite Hiring Intelligence for Vikaas.ai**
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Local First](https://img.shields.io/badge/Architecture-Local--First-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-9%20passed-success)](tests/)
+[![Architecture](https://img.shields.io/badge/arch-modular-blue)](signals/)
+[![Status](https://img.shields.io/badge/status-GSD%20Quality-orange)]()
 
-A high-performance, serverless signal detection engine designed to identify mass hiring events and corporate expansion signals in real-time. Built for **Vikaas.ai** to provide proactive talent market intelligence without the overhead of expensive LLM APIs.
-
----
-
-## 💎 Value Proposition for Vikaas.ai
-In the competitive landscape of talent acquisition, **timing is everything**. This system transforms public RSS feeds and web data into actionable intelligence. By detecting expansion signals (e.g., "new hub in Bangalore", "hiring 5k engineers") before they hit major job boards, Vikaas.ai can:
-- **Proactive Outreach**: Initiate conversations with companies *during* their expansion phase.
-- **Market Intelligence**: Track competitor growth and regional hiring trends.
-- **Cost Efficiency**: Zero-cost ingestion via local parsing instead of expensive AI tokens.
+## 💎 Value Proposition (Vikaas.ai)
+Vikaas.ai empowers users with unfair career advantages. The **Signal Detection System** is the engine behind that edge—it identifies massive hiring surges and expansion signals *before* they hit mainstream job boards. By monitoring "Scale-Up Signals" in real-time news, we provide Vikaas.ai users with a first-mover advantage, placing them at the front of the line for companies in rapid expansion.
 
 ---
 
-## 🏗️ Architecture & Design
-
-### High-Level Flow
+## 🏗️ System Architecture
 ```mermaid
 graph TD
-    A[data/companies.json] --> B(Orchestrator)
-    B --> C{Fetcher}
-    C -->|RSS Ingestion| D[Google/Bing News]
-    C -->|Web Scraping| E[Direct URL Fallback]
-    D & E --> F(Parser)
-    F -->|Regex Extraction| G[Feature Matrix]
-    G --> H(Scorer)
-    H -->|Heuristic Algorithm| I[Confidence Levels]
-    I --> J{Storage}
-    J -->|SQLite| K[data/signals.db]
-    J -->|JSON| L[outputs/signals.json]
-```
+    subgraph "Core Engine"
+        A[main.py CLI] --> B[Orchestrator]
+        B --> C[Fetcher]
+        B --> D[Parser]
+        B --> E[Scorer]
+        B --> F[Storage]
+    end
 
-### Design Approach
-- **Data Ingestion**: A dual-strategy approach using connection-pooled RSS fetching with an automated fallback to full-page BeautifulSoup scraping for deeper context.
-- **Scoring Logic**: A weighted heuristic model (`Total = Volume*0.4 + Source*0.4 + Keywords*0.2`) that balances volume magnitude, source credibility (Tier 1 vs Tier 3), and linguistic expansion markers.
-- **Assumptions & Limitations**:
-    - *Assumption*: News titles and summaries contain the most critical volume data.
-    - *Limitation*: Relies on public indexing; highly private hiring (unannounced) will not be captured.
-    - *Limitation*: Heuristic-based, so nuanced context might be missed compared to an LLM, though accuracy for numerical data is higher.
+    subgraph "Data Flow"
+        C -- RSS Ingestion --> G((Global News))
+        D -- Regex Patterns --> H{Entity/Volume}
+        E -- Multi-Band Heuristics --> I{Score 0-100}
+        F -- Persistence --> J[(SQLite / JSON)]
+    end
+
+    style B fill:#f96,stroke:#333,stroke-width:2px
+    style I fill:#dfd,stroke:#333
+    style J fill:#ddf,stroke:#333
+```
 
 ---
 
-## 🛠️ Setup & Usage
+## 🛠️ Tech Stack & Decisions (ADR-001)
 
-### Prerequisites
-- Python 3.12 or higher
-- Pip
+**Decision**: Local-first Python 3.12+ Architecture.
 
-### 1. Installation
+*   **Rationale**: Python's superior ecosystem for regex-based NLP and RSS ingestion (`feedparser`, `bs4`) allowed for rapid development of the tiered matching engine.
+*   **Local-First Philosophy**: We prioritized privacy and zero-latency processing. By keeping the intelligence engine local, we avoid heavy cloud costs while maintaining 100% control over the scraping heuristics.
+*   **Extensibility**: The modular design allows adding new signal types (e.g., funding rounds, executive shifts) by simply dropping a new module into `signals/`.
+
+---
+
+## 🚀 Quick Start (Get Shit Done)
+
+### 1. Install
 ```bash
-# Clone the repository
-git clone https://github.com/Rov-er-ing/InterviewGod.git
-cd InterviewGod
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Configuration
-Edit `data/companies.json` to add your target companies:
-```json
-[
-  {
-    "name": "Zomato",
-    "aliases": ["Zomato Ltd"],
-    "domain": "zomato.com"
-  }
-]
-```
-
-### 3. Run Detection
+### 2. Detect Signals
 ```bash
-# Run the live pipeline
-python orchestrator.py
+# Run production pipeline (Threshold 50)
+python main.py
 
-# Run a local demo with mock signals
-python demo.py
+# Run with custom threshold for higher sensitivity
+python main.py --threshold 30 --verbose
 ```
 
-### 4. Running Tests
-```bash
-python -m pytest tests/
-```
+### 3. Review Intelligence
+Intelligence is delivered to:
+*   `outputs/signals.json` (Human-readable export)
+*   `data/signals.db` (Persistent historical archive)
 
 ---
 
-## 📊 Sample Output (`signals.json`)
-```json
-{
-    "company_name": "Infosys",
-    "title": "Infosys to hire 10,000 freshers this year",
-    "url": "https://reuters.com/business/infosys-hiring",
-    "score": 100.0,
-    "confidence": "High",
-    "parsed_data": {
-        "max_volume": 10000,
-        "has_expansion_keywords": true,
-        "source_tier": "tier1"
-    }
-}
+## 📊 Scoring Formula (PRD §3.6)
+We use a **Multi-Band Additive Scoring** system to eliminate noise:
+*   **Tier 1 Keyword**: +20 pts (e.g., "massive hiring")
+*   **Tier 2 Keyword**: +10 pts (e.g., "expanding")
+*   **Volume Bonus**: +15 pts (if > 1000 roles detected)
+*   **Recency Bonus**: +10 pts (if article < 48h old)
+*   **Negative Penalty**: -50 pts (e.g., "layoffs", "freeze")
+
+---
+
+## 📂 Project Structure
+```text
+signal-detector/
+├── main.py                 # CLI Entry Point
+├── config.yaml             # Sources & Thresholds
+├── signals/
+│   ├── orchestrator.py      # Logic Coordinator
+│   └── mass_hiring/         # Core Detection Modules
+├── utils/
+│   ├── storage.py           # persistence (SQLite/JSON)
+│   └── logger.py            # Unified logging
+└── data/
+    └── companies.json       # Target watchlist
 ```
 
 ---
-
-## 📜 Architecture Decision Record (ADR)
-**Decision**: Choice of Python & Local-First Processing
-**Status**: Accepted
-**Context**: We needed a system that is rapid to deploy, cost-effective, and maintains total data privacy for the target list.
-**Rationale**: 
-- **Python**: Best-in-class libraries for scraping (`BeautifulSoup`) and RSS parsing (`feedparser`).
-- **FastAPI**: While currently running via an Orchestrator, the stack is designed to be wrapped in FastAPI for low-latency local API access in the next phase.
-- **Local-First**: Eliminates dependency on external LLM availability and per-token costs.
-
----
-
-## ⚖️ License
-MIT License. Created by Antigravity for InterviewGod.
+**Crafted with precision for Vikaas.ai. Results, not promises.**
