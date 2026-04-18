@@ -1,49 +1,58 @@
 import pytest
 from signals.mass_hiring.scorer import Scorer
-
-def test_volume_scoring():
-    scorer = Scorer()
-    assert scorer._calculate_volume_score(5000) == 100
-    assert scorer._calculate_volume_score(1000) == 60
-    assert scorer._calculate_volume_score(100) == 20
-    assert scorer._calculate_volume_score(0) == 0
-
-def test_source_scoring():
-    scorer = Scorer()
-    assert scorer._calculate_source_score("tier1") == 100
-    assert scorer._calculate_source_score("tier2") == 60
-    assert scorer._calculate_source_score("tier3") == 20
+from datetime import datetime, timezone, timedelta
 
 def test_confidence_mapping():
     scorer = Scorer()
     assert scorer._get_confidence_level(85) == "High"
     assert scorer._get_confidence_level(60) == "Medium"
     assert scorer._get_confidence_level(30) == "Low"
+    assert scorer._get_confidence_level(10) == "Noise"
 
-def test_full_scoring():
-    scorer = Scorer()
+def test_full_scoring_additive():
+    config = {"trusted_domains": ["techcrunch.com"]}
+    scorer = Scorer(config)
+    
+    # Yesterday's date for recency bonus
+    yesterday = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+    
     article = {
+        "url": "https://techcrunch.com/article",
+        "published_at": yesterday,
         "parsed_data": {
-            "max_volume": 5000,      # score 100 * 0.4 = 40
-            "source_tier": "tier1",  # score 100 * 0.4 = 40
-            "has_expansion_keywords": True # score 100 * 0.2 = 20
+            "tier1_matches": ["mass hiring"], # 25
+            "tier2_matches": ["hiring", "expansion"], # 20
+            "max_volume": 5000, # 15
         }
     }
-    # Total = 100
+    # 25 + 20 + 15 + 10 (trusted) + 10 (recency) = 80
     result = scorer.score(article)
-    assert result["score"] == 100
+    assert result["score"] == 80
     assert result["confidence"] == "High"
+    assert "mass hiring" in result["reason"]
 
-def test_partial_scoring():
+def test_negative_penalty():
     scorer = Scorer()
     article = {
         "parsed_data": {
-            "max_volume": 100,       # score 20 * 0.4 = 8
-            "source_tier": "tier3",  # score 20 * 0.4 = 8
-            "has_expansion_keywords": False # score 0 * 0.2 = 0
+            "tier1_matches": ["mass hiring"], # 25
+            "negative_matches": ["layoffs"] # -15
         }
     }
-    # Total = 16
+    # 25 - 15 = 10
     result = scorer.score(article)
-    assert result["score"] == 16
-    assert result["confidence"] == "Low"
+    assert result["score"] == 10
+    assert result["confidence"] == "Noise"
+    assert "negative signal" in result["reason"]
+
+def test_cap_logic():
+    scorer = Scorer()
+    article = {
+        "parsed_data": {
+            "tier1_matches": ["mass hiring", "hiring spree", "bulk recruitment"], # 25*3 = 75, cap at 50
+        }
+    }
+    # 50
+    result = scorer.score(article)
+    assert result["score"] == 50
+    assert result["confidence"] == "Medium"

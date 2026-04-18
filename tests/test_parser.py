@@ -15,15 +15,19 @@ def test_extract_million_volumes():
     volumes = parser._extract_volumes(text)
     assert 1000000 in volumes
 
-def test_expansion_keywords():
+def test_tiered_keywords():
     parser = Parser()
-    text = "Amazon announces a hiring spree for its new hub in Hyderabad."
-    keywords = parser._check_expansion(text)
-    assert "hiring spree" in keywords
-    assert "new hub" in keywords
+    text = "Amazon announces a hiring spree for its new office in Hyderabad. However, they might freeze hiring later."
+    result = parser.parse({"raw_text": text})
+    data = result["parsed_data"]
+    
+    assert "hiring spree" in data["tier1_matches"]
+    assert "new office" in data["tier2_matches"]
+    assert "freeze hiring" in data["negative_matches"]
 
 def test_detect_tier():
-    parser = Parser()
+    config = {"trusted_domains": ["reuters.com", "bloomberg.com"]}
+    parser = Parser(config)
     assert parser._detect_tier("https://www.reuters.com/business/tech") == "tier1"
     assert parser._detect_tier("https://www.moneycontrol.com/news") == "tier2"
     assert parser._detect_tier("https://random-blog.com/post") == "tier3"
@@ -37,5 +41,5 @@ def test_parse_article():
     result = parser.parse(article)
     data = result["parsed_data"]
     assert data["max_volume"] == 10000
-    assert data["has_expansion_keywords"] is True
+    assert len(data["tier1_matches"]) > 0
     assert data["source_tier"] == "tier1"

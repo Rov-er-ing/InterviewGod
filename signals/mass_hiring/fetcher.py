@@ -37,32 +37,28 @@ class Fetcher:
     def fetch_rss(self, company_name):
         """Fetches articles from various RSS sources for a company."""
         all_articles = []
-        queries = [
-            f"{company_name} hiring",
-            f"{company_name} expansion jobs"
-        ]
         
-        sources = [
-            "https://news.google.com/rss/search?q={query}",
-            "https://www.bing.com/news/search?q={query}&format=RSS"
-        ]
+        # Get sources from config or defaults
+        sources = self.config.get("rss_sources", [
+            "https://news.google.com/rss/search?q={company}+hiring",
+            "https://www.bing.com/news/search?q={company}+hiring&format=RSS"
+        ])
 
-        for query in queries:
-            encoded_query = quote_plus(query)
-            for source_template in sources:
-                url = source_template.format(query=encoded_query)
-                logger.info(f"Fetching RSS from: {url}")
-                
-                try:
-                    articles = self._parse_feed(url, company_name)
-                    all_articles.extend(articles)
-                    if len(all_articles) >= self.max_articles:
-                        break
-                except Exception as e:
-                    logger.warning(f"Failed to fetch RSS from {url}: {e}")
-                
-                # Small delay between sources to avoid rate limiting
-                time.sleep(random.uniform(1.0, 2.0))
+        for source_template in sources:
+            # Handle both {company} and {query} placeholders for backward compatibility
+            url = source_template.format(company=quote_plus(company_name), query=quote_plus(company_name))
+            logger.info(f"Fetching RSS from: {url}")
+            
+            try:
+                articles = self._parse_feed(url, company_name)
+                all_articles.extend(articles)
+                if len(all_articles) >= self.max_articles:
+                    break
+            except Exception as e:
+                logger.warning(f"Failed to fetch RSS from {url}: {e}")
+            
+            # Small delay between sources to avoid rate limiting
+            time.sleep(random.uniform(1.0, 2.0))
             
             if len(all_articles) >= self.max_articles:
                 break

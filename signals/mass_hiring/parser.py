@@ -1,12 +1,14 @@
 import re
 from utils.logger import logger
+from .keywords import TIER1_KEYWORDS, TIER2_KEYWORDS, TIER3_KEYWORDS, NEGATIVE_KEYWORDS
 
 class Parser:
     """
     Parses article text to extract mass hiring signals using regex patterns.
     """
 
-    def __init__(self):
+    def __init__(self, config=None):
+        self.config = config or {}
         # Patterns for hiring volumes (e.g., "5k+ hires", "10,000 engineers")
         self.volume_patterns = [
             # 10,000+ engineers, 5k roles, 500 jobs
@@ -17,21 +19,19 @@ class Parser:
             r'(\d+(?:\.\d+)?)\s*k\+?\s*(?:open\s+)?(?:engineers|roles|jobs|people|hires)'
         ]
 
-        # Patterns for expansion signals
-        self.expansion_keywords = [
-            r'mass hiring',
-            r'ramp up',
-            r'scaling up',
-            r'major expansion',
-            r'aggressive hiring',
-            r'global expansion',
-            r'hiring spree',
-            r'new (?:office|hub|center|campus)'
-        ]
+        # Tiered keywords from .keywords
+        self.tier1_keywords = TIER1_KEYWORDS
+        self.tier2_keywords = TIER2_KEYWORDS
+        self.tier3_keywords = TIER3_KEYWORDS
+        self.negative_keywords = NEGATIVE_KEYWORDS
 
-        # Trusted domains (already handled in scorer, but useful for parser to know context)
+        # Trusted domains from config or defaults
+        trusted = self.config.get("trusted_domains", [])
+        if not trusted:
+            trusted = ['reuters.com', 'bloomberg.com', 'techcrunch.com', 'wsj.com', 'ft.com']
+            
         self.source_tier_patterns = {
-            "tier1": [r'reuters\.com', r'bloomberg\.com', r'techcrunch\.com', r'wsj\.com', r'ft\.com'],
+            "tier1": [re.escape(domain) for domain in trusted],
             "tier2": [r'indiatimes\.com', r'moneycontrol\.com', r'business-standard\.com']
         }
 
@@ -45,8 +45,11 @@ class Parser:
         # 1. Extract Volumes
         volumes = self._extract_volumes(text)
         
-        # 2. Check for Expansion Keywords
-        expansion_signals = self._check_expansion(text)
+        # 2. Check for Tiered Keywords
+        tier1_matches = self._check_keywords(text, self.tier1_keywords)
+        tier2_matches = self._check_keywords(text, self.tier2_keywords)
+        tier3_matches = self._check_keywords(text, self.tier3_keywords)
+        negative_matches = self._check_keywords(text, self.negative_keywords)
         
         # 3. Detect Source Tier (if url available)
         source_tier = self._detect_tier(article.get("url", ""))
@@ -55,8 +58,10 @@ class Parser:
         article["parsed_data"] = {
             "max_volume": max(volumes) if volumes else 0,
             "all_volumes": volumes,
-            "has_expansion_keywords": len(expansion_signals) > 0,
-            "expansion_keywords_found": expansion_signals,
+            "tier1_matches": tier1_matches,
+            "tier2_matches": tier2_matches,
+            "tier3_matches": tier3_matches,
+            "negative_matches": negative_matches,
             "source_tier": source_tier
         }
         
@@ -73,7 +78,8 @@ class Parser:
                     num = float(raw_num)
                     # Handle "k" or "m" suffix
                     match_text = match.group(0).lower()
-                    if 'k' in match_text or 'thousand' in match_text:
+                    # Fix: Use re.search(r'\dk', match_text) instead of 'k' in match_text
+                    if re.search(r'\dk', match_text) or 'thousand' in match_text:
                         num *= 1000
                     elif 'm' in match_text or 'million' in match_text:
                         num *= 1000000
@@ -83,13 +89,15 @@ class Parser:
                     continue
         return sorted(list(set(volumes)), reverse=True)
 
-    def _check_expansion(self, text):
-        """Checks for expansion-related keywords."""
+    def _check_keywords(self, text, keyword_list):
+        """Checks for keywords in text and returns matches."""
         found = []
-        for kw in self.expansion_keywords:
-            match = re.search(kw, text, re.IGNORECASE)
+        for kw in keyword_list:
+            # Use word boundaries for better matching
+            pattern = r'\b' + re.escape(kw) + r'\b'
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                found.append(match.group(0))
+                found.append(kw)
         return found
 
     def _detect_tier(self, url):

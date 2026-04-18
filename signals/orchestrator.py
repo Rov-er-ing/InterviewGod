@@ -2,10 +2,10 @@ import yaml
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from signals.mass_hiring.fetcher import Fetcher
-from signals.mass_hiring.parser import Parser
-from signals.mass_hiring.scorer import Scorer
-from signals.storage import Storage
+from .mass_hiring.fetcher import Fetcher
+from .mass_hiring.parser import Parser
+from .mass_hiring.scorer import Scorer
+from utils.storage import Storage
 from utils.logger import logger
 
 class Orchestrator:
@@ -17,11 +17,11 @@ class Orchestrator:
     def __init__(self, config_path="config.yaml"):
         self.config = self._load_config(config_path)
         self.fetcher = Fetcher(self.config)
-        self.parser = Parser()
+        self.parser = Parser(self.config)
         self.scorer = Scorer(self.config)
         self.storage = Storage()
         self.companies = self._load_companies()
-        self.max_workers = self.config.get("runtime", {}).get("max_workers", 4)
+        self.max_workers = self.config.get("concurrency_workers", 4)
 
     def _load_config(self, path):
         try:
@@ -32,7 +32,7 @@ class Orchestrator:
             return {}
 
     def _load_companies(self):
-        path = "data/companies.json"
+        path = self.config.get("companies_file", "data/companies.json")
         try:
             if os.path.exists(path):
                 with open(path, 'r') as f:
@@ -61,8 +61,9 @@ class Orchestrator:
                 # 3. Score
                 scored_article = self.scorer.score(parsed_article)
                 
-                # Only keep signals with at least Medium confidence or specific volume
-                if scored_article["score"] >= 40:
+                # Only keep signals with at least the configured threshold
+                threshold = self.config.get("score_threshold", 50)
+                if scored_article["score"] >= threshold:
                     processed_signals.append(scored_article)
             
             return processed_signals
@@ -96,5 +97,6 @@ class Orchestrator:
         pass
 
 if __name__ == "__main__":
+    from signals.orchestrator import Orchestrator
     orchestrator = Orchestrator()
     orchestrator.run()
