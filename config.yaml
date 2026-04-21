@@ -3,9 +3,8 @@ output_dir: "outputs"
 output_format: "json"  # json | sqlite
 
 rss_sources:
-  - "https://news.google.com/rss/search?q={company}+hiring"
-  - "https://news.google.com/rss/search?q={company}+expansion+jobs"
-  - "https://www.bing.com/news/search?q={company}+hiring&format=RSS"
+  - "https://news.google.com/rss/search?q={company}+(hiring+OR+recruitment+OR+jobs+OR+expansion+OR+new+office+OR+vacancy+OR+opening)"
+  - "https://www.bing.com/news/search?q={company}+(hiring+OR+recruitment+OR+jobs+OR+expansion+OR+new+office+OR+vacancy+OR+opening)&format=RSS"
 
 score_threshold: 50
 fetch_timeout_seconds: 15

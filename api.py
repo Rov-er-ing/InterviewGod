@@ -59,15 +59,12 @@ def detect_signals(company: Optional[str] = None, limit: Optional[int] = Query(5
         if request and request.threshold is not None:
             orchestrator.config["score_threshold"] = request.threshold
 
-        orchestrator.run()
-        
-        # Return signals from today's run
-        storage = Storage()
-        signals = storage.get_all_signals()
+        signals, total_fetched = orchestrator.run()
         
         return {
             "status": "success",
             "companies_scanned": [c.get("name") for c in orchestrator.companies],
+            "total_articles_fetched": total_fetched,
             "signals_detected": len(signals),
             "data": signals,
             "note": "Bulk scans (>10 companies) should be run locally to avoid cloud timeouts."

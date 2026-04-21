@@ -49,39 +49,35 @@ class Orchestrator:
             return []
 
     def process_company(self, company):
-        """Processes a single company to detect hiring signals."""
+        """Pipeline for a single company. Returns (signals, total_articles_fetched)"""
         name = company.get("name")
-        logger.info(f"--- Starting processing for {name} ---")
+        logger.info(f"Processing signals for: {name}")
         
         try:
             # 1. Fetch
             articles = self.fetcher.fetch(name)
-            logger.info(f"Found {len(articles)} articles for {name}")
+            total_fetched = len(articles)
             
-            processed_signals = []
-            
+            # 2. Parse & 3. Score
+            signals = []
             for article in articles:
-                # 2. Parse
                 parsed_article = self.parser.parse(article)
+                score_data = self.scorer.score(parsed_article)
                 
-                # 3. Score
-                scored_article = self.scorer.score(parsed_article)
-                
-                # Only keep signals with at least the configured threshold
-                threshold = self.config.get("score_threshold", 50)
-                if scored_article["score"] >= threshold:
-                    processed_signals.append(scored_article)
+                if score_data["score"] >= self.config.get("score_threshold", 50):
+                    scored_article = {**parsed_article, **score_data}
+                    signals.append(scored_article)
             
-            return processed_signals
-            
+            return signals, total_fetched
         except Exception as e:
             logger.error(f"Error processing company {name}: {e}")
-            return []
+            return [], 0
 
     def run(self):
-        """Runs the detection pipeline for all target companies."""
+        """Runs the detection pipeline. Returns (all_signals, total_fetched)"""
         logger.info("Starting Signal Detection Pipeline")
         all_signals = []
+        total_fetched = 0
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_company = {executor.submit(self.process_company, company): company for company in self.companies}
@@ -89,20 +85,17 @@ class Orchestrator:
             for future in as_completed(future_to_company):
                 company = future_to_company[future]
                 try:
-                    signals = future.result()
+                    signals, fetched_count = future.result()
                     all_signals.extend(signals)
+                    total_fetched += fetched_count
                 except Exception as e:
                     logger.error(f"Company {company.get('name')} generated an exception: {e}")
         
         # 4. Storage
         self.storage.save_signals(all_signals)
-        logger.info(f"Pipeline complete. Total signals detected: {len(all_signals)}")
-
-    def _save_results(self, signals):
-        # Deprecated: Handled by self.storage.save_signals
-        pass
+        logger.info(f"Pipeline complete. Detected {len(all_signals)} signals from {total_fetched} articles.")
+        return all_signals, total_fetched
 
 if __name__ == "__main__":
-    from signals.orchestrator import Orchestrator
     orchestrator = Orchestrator()
     orchestrator.run()
