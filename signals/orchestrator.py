@@ -48,7 +48,7 @@ class Orchestrator:
             logger.error(f"Failed to load companies from {path}: {e}")
             return []
 
-    def process_company(self, company):
+    def process_company(self, company, show_noise=False):
         """Pipeline for a single company. Returns (signals, total_articles_fetched)"""
         name = company.get("name")
         logger.info(f"Processing signals for: {name}")
@@ -64,7 +64,8 @@ class Orchestrator:
                 parsed_article = self.parser.parse(article)
                 score_data = self.scorer.score(parsed_article)
                 
-                if score_data["score"] >= self.config.get("score_threshold", 50):
+                threshold = self.config.get("score_threshold", 50)
+                if score_data["score"] >= threshold or show_noise:
                     scored_article = {**parsed_article, **score_data}
                     signals.append(scored_article)
             
@@ -73,14 +74,14 @@ class Orchestrator:
             logger.error(f"Error processing company {name}: {e}")
             return [], 0
 
-    def run(self):
+    def run(self, show_noise=False):
         """Runs the detection pipeline. Returns (all_signals, total_fetched)"""
         logger.info("Starting Signal Detection Pipeline")
         all_signals = []
         total_fetched = 0
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_company = {executor.submit(self.process_company, company): company for company in self.companies}
+            future_to_company = {executor.submit(self.process_company, company, show_noise): company for company in self.companies}
             
             for future in as_completed(future_to_company):
                 company = future_to_company[future]

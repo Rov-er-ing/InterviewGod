@@ -32,7 +32,13 @@ def health_check():
     return {"status": "healthy"}
 
 @app.api_route("/detect", methods=["GET", "POST"])
-def detect_signals(company: Optional[str] = None, limit: Optional[int] = Query(5, ge=1, le=10), request: Optional[DetectionRequest] = None):
+def detect_signals(
+    company: Optional[str] = None, 
+    limit: Optional[int] = Query(5, ge=1, le=10), 
+    threshold: Optional[int] = Query(None, ge=0, le=100),
+    show_noise: bool = Query(False),
+    request: Optional[DetectionRequest] = None
+):
     """
     Triggers the detection pipeline with safety limits for Serverless environments.
     """
@@ -56,10 +62,12 @@ def detect_signals(company: Optional[str] = None, limit: Optional[int] = Query(5
         else:
             orchestrator.companies = orchestrator.companies[:limit]
 
-        if request and request.threshold is not None:
-            orchestrator.config["score_threshold"] = request.threshold
+        # Set threshold from query param OR request body
+        final_threshold = threshold if threshold is not None else (request.threshold if request else None)
+        if final_threshold is not None:
+            orchestrator.config["score_threshold"] = final_threshold
 
-        signals, total_fetched = orchestrator.run()
+        signals, total_fetched = orchestrator.run(show_noise=show_noise)
         
         return {
             "status": "success",

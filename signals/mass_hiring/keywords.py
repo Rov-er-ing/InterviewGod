@@ -7,8 +7,9 @@ TIER1_KEYWORDS = [
 
 TIER2_KEYWORDS = [
     'hiring', 'recruiting', 'recruitment drive', 'campus drive', 
-    'lateral hiring', 'fresher hiring', 'expansion', 'scaling up', 
-    'new office', 'headcount', 'workforce expansion', 'job openings'
+    'lateral hiring', 'fresher hiring', 'expansion', 'expanding', 'scaling up', 
+    'new office', 'headcount', 'workforce expansion', 'job openings', 'opening',
+    'recruit', 'growing'
 ]
 
 TIER3_KEYWORDS = [
