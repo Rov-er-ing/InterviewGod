@@ -29,3 +29,9 @@ logs/
 .gemini/
 temp/
 demo.py
+
+# Environment & Dependencies
+node_modules/
+.venv/
+.serverless/
+.vercel/
