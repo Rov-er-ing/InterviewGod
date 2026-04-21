@@ -15,9 +15,17 @@ class DetectionRequest(BaseModel):
     companies: Optional[List[str]] = None
     threshold: Optional[int] = None
 
+# Resolve the absolute path to config.yaml relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
+
 @app.get("/")
 def read_root():
-    return {"message": "Signal Detection System API is running"}
+    return {
+        "message": "Signal Detection System API is running",
+        "config_found": os.path.exists(CONFIG_PATH),
+        "env": "vercel" if os.environ.get("VERCEL") else "local"
+    }
 
 @app.get("/health")
 def health_check():
@@ -29,7 +37,10 @@ def detect_signals(request: Optional[DetectionRequest] = None):
     Triggers the detection pipeline.
     """
     try:
-        orchestrator = Orchestrator(config_path="config.yaml")
+        if not os.path.exists(CONFIG_PATH):
+            raise FileNotFoundError(f"Config file not found at {CONFIG_PATH}")
+            
+        orchestrator = Orchestrator(config_path=CONFIG_PATH)
         
         if request:
             if request.companies:

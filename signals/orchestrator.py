@@ -15,6 +15,7 @@ class Orchestrator:
     """
 
     def __init__(self, config_path="config.yaml"):
+        self.config_path = config_path
         self.config = self._load_config(config_path)
         self.fetcher = Fetcher(self.config)
         self.parser = Parser(self.config)
@@ -33,6 +34,11 @@ class Orchestrator:
 
     def _load_companies(self):
         path = self.config.get("companies_file", "data/companies.json")
+        # Resolve relative path based on the config file's location if it's not absolute
+        if not os.path.isabs(path):
+            config_dir = os.path.dirname(os.path.abspath(self.config_path))
+            path = os.path.join(config_dir, path)
+            
         try:
             if os.path.exists(path):
                 with open(path, 'r') as f:
