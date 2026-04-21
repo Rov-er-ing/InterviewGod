@@ -20,14 +20,18 @@ def setup_logger(name="signal_detector", level=logging.INFO):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # File handler
-    log_dir = "logs"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
-    file_handler = logging.FileHandler(os.path.join(log_dir, "app.log"))
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    # File handler (Gracefully skip if filesystem is read-only)
+    try:
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+        
+        file_handler = logging.FileHandler(os.path.join(log_dir, "app.log"))
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except (OSError, IOError) as e:
+        # Fallback for read-only filesystems (Vercel/Lambda)
+        logger.warning(f"File logging disabled: {e}")
 
     return logger
 
