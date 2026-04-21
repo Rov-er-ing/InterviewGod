@@ -1,26 +1,206 @@
 [
   {
     "name": "Infosys",
-    "aliases": ["Infosys Ltd", "Infosys Technologies"],
+    "aliases": [
+      "Infosys Ltd",
+      "Infosys Technologies"
+    ],
     "domain": "infosys.com",
     "industry": "IT Services"
   },
   {
     "name": "Zomato",
-    "aliases": ["Zomato Ltd"],
+    "aliases": [
+      "Zomato Ltd"
+    ],
     "domain": "zomato.com",
     "industry": "Food Tech"
   },
   {
     "name": "Wipro",
-    "aliases": ["Wipro Limited"],
+    "aliases": [
+      "Wipro Limited"
+    ],
     "domain": "wipro.com",
     "industry": "IT Services"
   },
   {
     "name": "Reliance",
-    "aliases": ["Reliance Industries"],
+    "aliases": [
+      "Reliance Industries"
+    ],
     "domain": "reliance.com",
     "industry": "Conglomerate"
+  },
+  {
+    "name": "Apple",
+    "aliases": [
+      "Apple Inc",
+      "Apple India"
+    ],
+    "domain": "apple.com",
+    "industry": "Technology"
+  },
+  {
+    "name": "NVIDIA",
+    "aliases": [
+      "NVIDIA Corporation"
+    ],
+    "domain": "nvidia.com",
+    "industry": "Semiconductors"
+  },
+  {
+    "name": "Google",
+    "aliases": [
+      "Alphabet Inc",
+      "Google India"
+    ],
+    "domain": "google.com",
+    "industry": "Technology"
+  },
+  {
+    "name": "Microsoft",
+    "aliases": [
+      "Microsoft Corporation",
+      "MSFT"
+    ],
+    "domain": "microsoft.com",
+    "industry": "Technology"
+  },
+  {
+    "name": "Amazon",
+    "aliases": [
+      "Amazon.com Inc",
+      "Amazon Web Services",
+      "AWS"
+    ],
+    "domain": "amazon.com",
+    "industry": "E-commerce/Cloud"
+  },
+  {
+    "name": "TCS",
+    "aliases": [
+      "Tata Consultancy Services"
+    ],
+    "domain": "tcs.com",
+    "industry": "IT Services"
+  },
+  {
+    "name": "Accenture",
+    "aliases": [
+      "Accenture PLC"
+    ],
+    "domain": "accenture.com",
+    "industry": "Consulting"
+  },
+  {
+    "name": "Meta",
+    "aliases": [
+      "Facebook",
+      "Meta Platforms"
+    ],
+    "domain": "meta.com",
+    "industry": "Social Media"
+  },
+  {
+    "name": "Tesla",
+    "aliases": [
+      "Tesla Inc"
+    ],
+    "domain": "tesla.com",
+    "industry": "Automotive/Energy"
+  },
+  {
+    "name": "HCLTech",
+    "aliases": [
+      "HCL Technologies"
+    ],
+    "domain": "hcltech.com",
+    "industry": "IT Services"
+  },
+  {
+    "name": "Flipkart",
+    "aliases": [
+      "Flipkart Internet",
+      "Flipkart Private Limited"
+    ],
+    "domain": "flipkart.com",
+    "industry": "E-commerce"
+  },
+  {
+    "name": "Paytm",
+    "aliases": [
+      "One97 Communications",
+      "Paytm Payments Bank"
+    ],
+    "domain": "paytm.com",
+    "industry": "Fintech"
+  },
+  {
+    "name": "Swiggy",
+    "aliases": [
+      "Bundl Technologies"
+    ],
+    "domain": "swiggy.com",
+    "industry": "Food Tech"
+  },
+  {
+    "name": "Ola",
+    "aliases": [
+      "ANI Technologies",
+      "Ola Cabs",
+      "Ola Electric"
+    ],
+    "domain": "olacabs.com",
+    "industry": "Mobility"
+  },
+  {
+    "name": "Mahindra",
+    "aliases": [
+      "Mahindra & Mahindra",
+      "M&M"
+    ],
+    "domain": "mahindra.com",
+    "industry": "Automotive/Conglomerate"
+  },
+  {
+    "name": "HDFC Bank",
+    "aliases": [
+      "HDFC"
+    ],
+    "domain": "hdfcbank.com",
+    "industry": "Banking"
+  },
+  {
+    "name": "Freshworks",
+    "aliases": [
+      "Freshdesk"
+    ],
+    "domain": "freshworks.com",
+    "industry": "SaaS"
+  },
+  {
+    "name": "Zoho",
+    "aliases": [
+      "Zoho Corporation"
+    ],
+    "domain": "zoho.com",
+    "industry": "SaaS"
+  },
+  {
+    "name": "LTIMindtree",
+    "aliases": [
+      "Larsen & Toubro Infotech"
+    ],
+    "domain": "ltimindtree.com",
+    "industry": "IT Services"
+  },
+  {
+    "name": "Tech Mahindra",
+    "aliases": [
+      "TechM"
+    ],
+    "domain": "techmahindra.com",
+    "industry": "IT Services"
   }
 ]

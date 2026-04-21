@@ -68,6 +68,31 @@ Intelligence is delivered to:
 
 ---
 
+## ☁️ Serverless Deployment
+
+This system is pre-configured for deployment to **AWS Lambda** using the Serverless Framework.
+
+### 1. Prerequisites
+*   Node.js (for Serverless CLI)
+*   `npm install -g serverless`
+*   AWS Credentials configured
+
+### 2. Deploy
+```bash
+# Install serverless plugins
+npm install
+
+# Deploy to AWS
+sls deploy
+```
+
+### 3. API Usage
+Once deployed, you can trigger detection via HTTP:
+*   `POST /detect`: Run pipeline (optionally pass `{"companies": ["Name"], "threshold": 50}`)
+*   `GET /signals`: Retrieve stored signals
+
+---
+
 ## 📊 Scoring Formula (PRD §3.6)
 We use a **Multi-Band Additive Scoring** system to eliminate noise:
 *   **Tier 1 Keyword**: +20 pts (e.g., "massive hiring")
@@ -82,6 +107,8 @@ We use a **Multi-Band Additive Scoring** system to eliminate noise:
 ```text
 signal-detector/
 ├── main.py                 # CLI Entry Point
+├── api.py                  # FastAPI Serverless Wrapper
+├── serverless.yml           # AWS Lambda Configuration
 ├── config.yaml             # Sources & Thresholds
 ├── signals/
 │   ├── orchestrator.py      # Logic Coordinator

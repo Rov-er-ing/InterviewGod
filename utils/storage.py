@@ -10,8 +10,13 @@ class Storage:
     """
 
     def __init__(self, db_path="data/signals.db", json_path="outputs/signals.json"):
-        self.db_path = db_path
-        self.json_path = json_path
+        # Use /tmp in Serverless environments (AWS Lambda or Vercel)
+        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("VERCEL"):
+            self.db_path = f"/tmp/{os.path.basename(db_path)}"
+            self.json_path = f"/tmp/{os.path.basename(json_path)}"
+        else:
+            self.db_path = db_path
+            self.json_path = json_path
         self._init_db()
 
     def _init_db(self):

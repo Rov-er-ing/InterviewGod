@@ -1,0 +1,40 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: shitiz
+service: signal-detection-system
+
+provider:
+  name: aws
+  runtime: python3.12
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  environment:
+    PYTHONPATH: .
+    CONFIG_PATH: config.yaml
+
+functions:
+  api:
+    handler: api.handler
+    events:
+      - httpApi: '*'
+  
+  detect-worker:
+    handler: main.main
+    events:
+      - schedule: rate(24 hours)
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+
+package:
+  individually: true
+  exclude:
+    - .venv/**
+    - node_modules/**
+    - tests/**
+    - .pytest_cache/**
+    - .git/**
+    - .planning/**
