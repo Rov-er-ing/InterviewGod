@@ -32,9 +32,9 @@ def health_check():
     return {"status": "healthy"}
 
 @app.api_route("/detect", methods=["GET", "POST"])
-def detect_signals(request: Optional[DetectionRequest] = None):
+def detect_signals(company: Optional[str] = None, limit: Optional[int] = Query(5, ge=1, le=10), request: Optional[DetectionRequest] = None):
     """
-    Triggers the detection pipeline.
+    Triggers the detection pipeline with safety limits for Serverless environments.
     """
     try:
         if not os.path.exists(CONFIG_PATH):
@@ -42,26 +42,35 @@ def detect_signals(request: Optional[DetectionRequest] = None):
             
         orchestrator = Orchestrator(config_path=CONFIG_PATH)
         
-        if request:
-            if request.companies:
-                # Filter companies to only those requested
-                # Note: This assumes orchestrator.companies is a list of dicts from companies.json
-                all_companies = orchestrator.companies
-                orchestrator.companies = [c for c in all_companies if c.get("name") in request.companies]
-            
-            if request.threshold is not None:
-                orchestrator.config["score_threshold"] = request.threshold
+        # Priority 1: Explicit company name in Query Param
+        if company:
+            orchestrator.companies = [c for c in orchestrator.companies if c.get("name").lower() == company.lower()]
+            if not orchestrator.companies:
+                return {"status": "error", "message": f"Company '{company}' not found in watch list."}
+
+        # Priority 2: List of companies in POST body
+        elif request and request.companies:
+            orchestrator.companies = [c for c in orchestrator.companies if c.get("name") in request.companies]
+        
+        # Priority 3: Default safety limit (Top N companies) to prevent 10s timeout
+        else:
+            orchestrator.companies = orchestrator.companies[:limit]
+
+        if request and request.threshold is not None:
+            orchestrator.config["score_threshold"] = request.threshold
 
         orchestrator.run()
         
-        # Return signals from today's run (from the storage)
+        # Return signals from today's run
         storage = Storage()
         signals = storage.get_all_signals()
         
         return {
             "status": "success",
+            "companies_scanned": [c.get("name") for c in orchestrator.companies],
             "signals_detected": len(signals),
-            "data": signals
+            "data": signals,
+            "note": "Bulk scans (>10 companies) should be run locally to avoid cloud timeouts."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
